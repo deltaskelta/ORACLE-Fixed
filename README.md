@@ -11,8 +11,8 @@ This is an implementation of the ORACLE-Fixed machine learning algorithm as defi
 ## TO RUN
 
 ```bash
-git clone [repo]
-cd [repo]
+git clone https://github.com/deltaskelta/ORACLE-Fixed.git
+cd ORACLE-Fixed
 make setup
 make learn
 ```
