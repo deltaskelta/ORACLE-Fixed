@@ -5,7 +5,6 @@ data loader to load the MNIST data
 import gzip
 import sys
 import numpy as np
-from matplotlib import pyplot as plt
 
 np.set_printoptions(threshold=sys.maxsize, linewidth=150)
 
@@ -24,13 +23,16 @@ def load_data():
 
     # read image data into memory, and reshape into list of image pixels
     img_buf = img_f.read(image_size * image_size * num_images)
-    img_data = np.frombuffer(img_buf, dtype=np.uint8).astype(np.uint8)
+    img_data = np.frombuffer(img_buf, dtype=np.uint8).astype(np.float64)
     img_data = img_data.reshape(num_images, image_size, image_size, 1)
 
     label_buf = label_f.read(1 * num_images)
     label_data = np.frombuffer(label_buf, dtype=np.uint8).astype(np.uint8)
     label_data = label_data.reshape(num_images, 1)
 
+    print(
+        "terminal can handle 150 chars per line in order to display images correctly"
+    )
     cont = True
     i = 0
     while cont:
@@ -40,9 +42,6 @@ def load_data():
         print("pixels")
         print(image)
 
-        # uncomment to plot the image
-        # plt.imshow(image)
-        # plt.show()
         cont = input(
             "press letter<enter> to see more examples, <enter> to continue: ")
         i += 1
@@ -53,12 +52,10 @@ def load_data():
         digit = label_data[i][0]
         data[digit].append(img_data[i])
 
-    for i in data.keys():
-        print(len(data[i]))
-
     see = input("see sorted examples (y/n): ")  # sanity check
     if see == 'y':
         for i in data.keys():
+            print("there are {} examples of {}'s".format(len(data[i]), i))
             for j in range(5):
                 print("image is a {}".format(i))
                 image = np.asarray(data[i][j]).squeeze()
