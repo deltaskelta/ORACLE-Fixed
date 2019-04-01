@@ -25,16 +25,14 @@ def predict(inputs, thetas):
     inputs = add_bias_col(inputs)
 
     # feed forward to layer 2 and apply sigmoid
-    z_values = [np.dot(inputs, np.transpose(
-        thetas[0]))]  # values before the application of the sigmoid
-    a_values = [sigmoid(
-        z_values[0])]  # values after the application of the sigmoid
+    z_values = [np.dot(inputs, thetas[0].T)]
+    a_values = [sigmoid(z_values[0])]
 
     # add bias column to a_two
     a_values[0] = add_bias_col(a_values[0])
 
     # feed forward to layer three
-    z_values.append(np.dot(a_values[0], np.transpose(thetas[1])))
+    z_values.append(np.dot(a_values[0], thetas[1].T))
     a_values.append(sigmoid(z_values[1]))
 
     return a_values, z_values
@@ -61,7 +59,8 @@ def add_bias_col(arr):
     return np.insert(arr, [0], [1], axis=1)
 
 
-def non_oracle_cost(lambd, thetas, y, X):
+# pylint: disable=too-many-arguments
+def cost(m, lambd, thetas, y, X, complx):
     """
     the standard non ORACLE cost function.
     since we are training by each label in sets, the y value is just an integer label and not a one
@@ -69,7 +68,6 @@ def non_oracle_cost(lambd, thetas, y, X):
     """
 
     A, Z = predict(X, thetas)
-    m = X.shape[0]
 
     # expand the scalar value into a one vs all output vector
     labels = np.zeros((1, 10))
@@ -79,12 +77,12 @@ def non_oracle_cost(lambd, thetas, y, X):
     # compute the gradients to return as well
     d_three = np.subtract(A[1], labels)
 
-    d_two = np.dot(np.transpose(thetas[1])[1:, :], np.transpose(d_three))
-    d_two = np.multiply(d_two, np.transpose(sigmoid_gradient(Z[0])))
+    d_two = np.dot(thetas[1].T[1:, :], d_three.T)
+    d_two = np.multiply(d_two, sigmoid_gradient(Z[0]).T)
 
     gradients = []
     gradients.append(np.dot(d_two, X) / m)  # theta 1 gradient
-    gradients.append(np.dot(np.transpose(d_three), A[0])[:, 1:] / m)
+    gradients.append(np.dot(d_three.T, A[0])[:, 1:] / m)
 
     # the first term of the cost function -y * log(h(x))
     J = np.multiply(labels, np.log(A[1]))
@@ -92,16 +90,59 @@ def non_oracle_cost(lambd, thetas, y, X):
     J += np.multiply(1 - labels, np.log(1 - A[1]))
     # subtract k - l, then sum both dimensions of the matrix
     J = -np.sum(J) / m
-    # add lambda regularization
-    r = 0
-    for i, _ in enumerate(thetas):
-        r += np.sum(np.square(thetas[i][:, 1:]))
-    J += (r * lambd / (2 * m))
+    # add lambda regularization (complexity term)
+    J += complx
 
     for i, v in enumerate(gradients):
         gradients[i] = np.add(v, lambd / m * v)
 
     return J, gradients
+
+
+def l2_normalization(thetas, lambd, m):
+    """l2 normalization of theta values"""
+
+    r = 0
+    for i, _ in enumerate(thetas):
+        r += np.sum(np.square(thetas[i][:, 1:]))
+    return r * lambd / (2 * m)
+
+
+def theta_difference_l2_normalization(thetas, thetas_prev, lambd):
+    """l2 normalization based on the difference in theta values"""
+    r = 0
+    for i, _ in enumerate(thetas):
+        t = thetas[i] - thetas_prev[i]
+        r += np.sum(np.square(t[:, 1:]))
+    return r * lambd
+
+
+def make_tau(sigma):
+    """make the tau parameter for the ORACLE-Fixed algorithm"""
+
+    print("theta size: ", sigma.shape)
+    u, s, v = np.linalg.svd(sigma, full_matrices=True)
+    print("u size: ", u.shape)
+    print("sigma size: ", s.shape)
+    print("v.shape: ", v.shape)
+
+    p = np.dot(u, np.sqrt(np.diag(s)))
+    print("p size: ", p.shape)
+
+    # TODO: the zeros term needs to expand theta to be compatible with p
+    # you can check p's size and add whatever is needed
+
+    # it should be the same size as theta (p * q.T) and p and q should be sparse
+    # it should a
+    s = np.diag(s)
+    S = np.append(s, np.zeros((v.shape[0] - u.shape[0], s.shape[0])), axis=0)
+    #S = np.append(s, np.zeros(()))
+    print("S shape: ", S.shape)
+    print(p)
+    q = np.dot(v, np.sqrt(S))
+    print(q)
+
+    return np.dot(p, q.T)
 
 
 def reshape_examples(d):
