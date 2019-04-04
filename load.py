@@ -16,7 +16,8 @@ def load_data():
 
     # images are stored in this dimension
     image_size = 28
-    num_images = 6000
+    num_images = 30000
+    train_set = 24000
 
     img_f.read(16)  # skip non image data
     label_f.read(8)  # skip non label data
@@ -47,18 +48,14 @@ def load_data():
         i += 1
 
     data = {i: [] for i in range(10)}
+    val = {i: [] for i in range(10)}
+
     for i in range(num_images):
         # since the labels are all scalars, we can just get the 0 index
         digit = label_data[i][0]
-        data[digit].append(img_data[i])
+        if i < train_set:
+            data[digit].append(img_data[i])
+        else:
+            val[digit].append(img_data[i])
 
-    see = input("see sorted examples (y/n): ")  # sanity check
-    if see == 'y':
-        for i in data.keys():
-            print("there are {} examples of {}'s".format(len(data[i]), i))
-            for j in range(5):
-                print("image is a {}".format(i))
-                image = np.asarray(data[i][j]).squeeze()
-                print(image)
-
-    return data
+    return data, val
