@@ -6,8 +6,8 @@ import math
 import numpy as np
 
 # both will be +1 column for bias
-T1 = (32, 784 + 1)
-T2 = (10, 32 + 1)
+T1 = (64, 784 + 1)
+T2 = (10, 64 + 1)
 
 
 def sigmoid(x):
@@ -100,16 +100,6 @@ def l2_normalization(thetas, lambd, m):
     return r * lambd / (2 * m)
 
 
-def theta_difference_l2_normalization(thetas, thetas_prev, m, lambd):
-    """l2 normalization based on the difference in theta values"""
-
-    r = 0
-    for i, _ in enumerate(thetas):
-        t = thetas[i] - thetas_prev[i]
-        r += np.sum(np.square(t[:, 1:]))
-    return r * lambd
-
-
 def cost(thetas, m, lambd, y, X):
     """
     the standard non ORACLE cost function.
@@ -122,10 +112,9 @@ def cost(thetas, m, lambd, y, X):
 
     # A = [1x6, 1x1] Z = [1x5, 1x1]
     A, Z = predict(X, thetas)
-    labels = make_labels(y, m)
 
     # compute the deltas and gradients to return as well
-    d_three = A[1] - labels  # 1x1
+    d_three = A[1] - y  # 1x1
     # (1x6).T * 1x1 = 6x1 --> 5x1 (from indexing)
     d_two = np.dot(thetas[1].T, d_three.T)[1:, :] * sigmoid_gradient(Z[0]).T
 
@@ -134,13 +123,24 @@ def cost(thetas, m, lambd, y, X):
         np.dot(d_three.T, A[0]) / m  # 1x1 * 1x6 = 1x6
     ]
 
-    J = log_likelihood(labels, A, m)
+    J = log_likelihood(y, A, m)
     J += l2_normalization(thetas, lambd, m)  # lambda complexity penalty
 
     for i, _ in enumerate(gradients):
         gradients[i][:, 1:] += lambd / m * thetas[i][:, 1:]
 
+    print("cost: ", J)
     return J, ravel_theta(gradients)
+
+
+def theta_difference_l2_normalization(thetas, thetas_prev, m, lambd):
+    """l2 normalization based on the difference in theta values"""
+
+    r = 0
+    for i, _ in enumerate(thetas):
+        t = thetas[i] - thetas_prev[i]
+        r += np.sum(np.square(t[:, 1:]))
+    return r * lambd
 
 
 # pylint: disable=too-many-locals, too-many-arguments
@@ -151,24 +151,14 @@ def theta_diff_cost(thetas, thetas_prev, m, lambd, y, X):
     vs all vector
     """
 
-    thetas_mag = np.sqrt(np.sum(np.square(thetas)))
-    thetas_pre_mag = np.sqrt(np.sum(np.square(thetas_prev)))
-    print("thetas: ", thetas_mag, " thetas_prev: ", thetas_pre_mag)
-
-    # TODO: should this difference be calculated ignoring the bias theta units? if so, this needs to move to
-    # a calulation that happens after the theta values are unrolled
-    err = np.sqrt(np.sum(np.square(thetas[:, 1:] - thetas_prev[:, 1:])))
-    print("calculated error is: ", err)
-
     X = add_bias_col(X)
     thetas = unravel_theta(thetas)
     thetas_prev = unravel_theta(thetas_prev)
 
     A, Z = predict(X, thetas)
-    labels = make_labels(y, m)
 
     # compute the deltas and gradients to return as well
-    d_three = A[1] - labels
+    d_three = A[1] - y
     d_two = np.dot(thetas[1].T, d_three.T)[1:, :] * sigmoid_gradient(Z[0]).T
 
     gradients = [
@@ -177,16 +167,15 @@ def theta_diff_cost(thetas, thetas_prev, m, lambd, y, X):
     ]
 
     # add lambda regularization (complexity term)
-    J = log_likelihood(labels, A, m)
+    J = log_likelihood(y, A, m)
     diff = theta_difference_l2_normalization(thetas, thetas_prev, m, lambd)
     J += diff
-    print("cost: {} penalization: {}".format(J, diff))
 
     for i, _ in enumerate(gradients):
-        gradients[i][:, 1:] += 2 * lambd * thetas[i][:, 1:]
+        gradients[i][:, 1:] += 2 * lambd * (
+            thetas[i][:, 1:] - thetas_prev[i][:, 1:])
 
-    print(J)
-
+    print("cost: ", J, " diff: ", diff)
     return J, ravel_theta(gradients)
 
 
@@ -228,11 +217,6 @@ def oracle_fixed_cost(thetas, shared, ps, qs, m, lambd, lambd2, y, X):
         gradients[i][:, 1:] = np.add(v[:, 1:], lambd / m * v[:, 1:])
 
     return J, ravel_theta(gradients)
-
-
-def callback(xk):
-    """callback made on every loop of cost by optimization func"""
-    return True
 
 
 def ravel_theta(thetas):
@@ -318,7 +302,7 @@ def check_td_gradients(theta_vec, y, data):
 
 
 def reshape_examples(d):
-    """reshape dict of sorted examples into a dict of MxN matrixes"""
+    """reshape dict of sorted examples into a dict of MxN matrices"""
     # unroll data into 1 X N vectors
 
     print("\nreshaping examples...")

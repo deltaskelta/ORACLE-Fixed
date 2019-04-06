@@ -1,5 +1,5 @@
 """
-This is an implementation of the ORACLE-Fixed learning algorithm
+an implementation of the ORACLE-Fixed learning algorithm
 """
 
 import scipy.optimize as op
@@ -23,8 +23,39 @@ def validation_predict(val_set, thetas, i):
 # pylint: disable=too-many-locals
 def plain_nn(data, order, theta_vec, val):
     """
-    train a neural network with l2 theta regularization that forgets everything when
-    learning a new task
+    train a neural network that learns the entire dataset at once as a base to judge continous
+    learning algorithms against
+    """
+    lambd = 1
+
+    examples = np.array(data[0])
+    labels = np.array(utils.make_labels(0, data[0].shape[0]))
+    for i, _ in enumerate(data, start=0):
+        if i != 0:
+            y = order[i]
+            m = data[y].shape[0]
+            labels = np.append(labels, utils.make_labels(y, 200), axis=0)
+            examples = np.append(examples, data[y][:200, :], axis=0)
+
+    res = op.minimize(
+        utils.cost,
+        theta_vec,
+        method='CG',
+        jac=True,
+        options=dict({
+            "disp": True,
+            "maxiter": 100,
+        }),
+        args=(m, lambd, labels, examples))
+
+    validation_predict(val, utils.unravel_theta(res["x"]), 9)
+
+
+# pylint: disable=too-many-locals
+def plain_forgetful_nn(data, order, theta_vec, val):
+    """
+    train a network to learn new tasks with plain l2 regularization, forgets everything 
+    previous when learning a new task
     """
     lambd = 1
 
@@ -42,8 +73,8 @@ def plain_nn(data, order, theta_vec, val):
             }),
             args=(m, lambd, y, data[y]))
 
-        thetas = utils.unravel_theta(res["x"])
-        validation_predict(val, thetas, i)
+        theta_vec = res["x"].copy()
+        validation_predict(val, utils.unravel_theta(theta_vec), i)
 
 
 # pylint: disable=too-many-locals
@@ -52,11 +83,11 @@ def theta_distance_reg(data, order, theta_vec, val):
     train a NN with l2 regularization on thetas^l - thetas^l-1, which should place a higher cost
     when theta changes a more from the previous theta
     """
-    lambd = 1
-    first_theta = np.array([])
+    lambd = 100
     for i, _ in enumerate(data, start=0):
         y = order[i]
         m = data[y].shape[0]
+        labels = utils.make_labels(i, m)
 
         # If we are on the first loop we want regular l2 normalization because we want to
         # enforce that Thetas should be as low valued as possible. If it is not in loop one
@@ -69,15 +100,10 @@ def theta_distance_reg(data, order, theta_vec, val):
                 jac=True,
                 options=dict({
                     "disp": True,
+                    "maxiter": 50,
                 }),
-                callback=utils.callback,
-                args=(m, 1, y, data[y]))
-
-            first_theta = res["x"].copy()
+                args=(m, 1, labels, data[y]))
         else:
-            #if i == 1:
-            #    utils.check_td_gradients(theta_vec, y, data[y][:1, :])
-
             res = op.minimize(
                 utils.theta_diff_cost,
                 theta_vec,
@@ -85,9 +111,9 @@ def theta_distance_reg(data, order, theta_vec, val):
                 jac=True,
                 options=dict({
                     "disp": True,
+                    "maxiter": 50,
                 }),
-                callback=utils.callback,
-                args=(first_theta, m, lambd, y, data[y]))
+                args=(theta_vec.copy(), m, lambd, labels, data[y]))
 
         # set current theta vec for next loop complexity calc
         theta_vec = res["x"].copy()
@@ -121,7 +147,6 @@ def oracle_fixed(data, order, theta_vec, val):
                 options=dict({
                     "disp": True,
                 }),
-                callback=utils.callback,
                 args=(m, 1, y, data[y]))
         else:
             shared_prev = theta_vec.copy()
@@ -145,7 +170,6 @@ def oracle_fixed(data, order, theta_vec, val):
                 options=dict({
                     "disp": True,
                 }),
-                callback=utils.callback,
                 args=(shared_prev, ps, qs, m, lambd, lambd2, y, data[y]))
 
         theta_vec = res["x"].copy()
@@ -169,4 +193,5 @@ if __name__ == '__main__':
 
     theta_distance_reg(d, list(d), tv, v)
     plain_nn(d, list(d), tv, v)
+    plain_forgetful_nn(d, list(d), tv, v)
     #oracle_fixed(d, list(d), tv, v)
