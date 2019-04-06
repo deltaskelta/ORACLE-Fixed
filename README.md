@@ -10,8 +10,6 @@ This is an implementation of the ORACLE-Fixed machine learning algorithm as defi
 
 ## TODO
 
-- extract the prediction from the cost functions to do next item
-- move gradient calculation and cost calculation to different functions
 - get the l2 trasnfer regularizer working
 - get the ORACLE-Firxed algorithm working
 
