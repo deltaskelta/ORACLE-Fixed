@@ -20,6 +20,9 @@ This is an implementation of the ORACLE-Fixed machine learning algorithm as defi
 ```bash
 git clone https://github.com/deltaskelta/ORACLE-Fixed.git
 cd ORACLE-Fixed
-make setup
-make learn
+
+python3 -m venv ./env
+source ./env/bin/activate
+pip install -r requirements.txt
+python oracle.py
 ```
